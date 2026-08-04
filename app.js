@@ -1,11 +1,9 @@
 // app.js
 import express from "express";
+import metaRoutes from "./routes/meta.routes.js";
 
 const app = express();
 app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.status(200).send("Hello, server!");
-});
+app.use("/", metaRoutes);
 
 export default app;
