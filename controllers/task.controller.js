@@ -6,7 +6,27 @@ function isValidTitle(title) {
 }
 
 export function listTasks(req, res) {
-  res.status(200).json(Task.getAll());
+  let result = Task.getAll();
+
+  const { done, search, limit, offset } = req.query;
+
+  if (done !== undefined) {
+    const wantDone = done === "true";
+    result = result.filter((t) => t.done === wantDone);
+  }
+
+  if (search) {
+    const term = String(search).toLowerCase();
+    result = result.filter((t) => t.title.toLowerCase().includes(term));
+  }
+
+  if (offset !== undefined || limit !== undefined) {
+    const start = Number(offset) || 0;
+    const end = limit !== undefined ? start + Number(limit) : undefined;
+    result = result.slice(start, end);
+  }
+
+  res.status(200).json(result);
 }
 
 export function getTask(req, res) {
@@ -68,4 +88,20 @@ export function deleteTask(req, res) {
   }
 
   res.status(204).send();
+}
+
+export function getStats(req, res) {
+  const all = Task.getAll();
+  const done = all.filter((t) => t.done).length;
+
+  res.status(200).json({
+    total: all.length,
+    done,
+    open: all.length - done,
+  });
+}
+
+export function resetTasks(req, res) {
+  const tasks = Task.reset();
+  res.status(200).json({ message: "Tasks reset to seed data", tasks });
 }

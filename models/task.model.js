@@ -2,11 +2,13 @@
 // The "database" for this assignment: an in-memory list.
 // Data lives only in memory - it resets every time the server restarts.
 
-let tasks = [
+const SEED_TASKS = [
   { id: 1, title: "Buy milk", done: false },
   { id: 2, title: "Read chapter 3", done: true },
   { id: 3, title: "Write CRUD API", done: false },
 ];
+
+let tasks = SEED_TASKS.map((t) => ({ ...t }));
 let nextId = tasks.length + 1;
 
 export function getAll() {
@@ -39,4 +41,10 @@ export function remove(id) {
 
   tasks.splice(index, 1);
   return true;
+}
+
+export function reset() {
+  tasks = SEED_TASKS.map((t) => ({ ...t }));
+  nextId = tasks.length + 1;
+  return tasks;
 }
