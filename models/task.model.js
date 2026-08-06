@@ -14,3 +14,8 @@ export function getById(id) {
   const row = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id);
   return row ? toTask(row) : undefined;
 }
+
+export function create({ title }) {
+  const result = db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)").run(title, 0);
+  return getById(result.lastInsertRowid);
+}
