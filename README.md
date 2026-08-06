@@ -5,9 +5,10 @@ Built for FlyRank Internship — Backend Track — Week 2 — Assignment A1.
 
 ## What this is
 
-- A REST API with full CRUD on a to-do list, stored in memory (no database).
+- A REST API with full CRUD on a to-do list, backed by a real **SQLite database** (`tasks.db`).
 - Built with Node.js + Express (ESM modules), following an **MVC structure**:
-  - `models/` — the in-memory task "database"
+  - `db/` — the SQLite connection, table creation, and one-time seed
+  - `models/` — SQL queries wrapped as plain functions (the data-access layer)
   - `controllers/` — business logic and validation for each endpoint
   - `routes/` — maps paths + HTTP methods to controllers
   - `app.js` — wires everything together
@@ -22,6 +23,32 @@ npm start
 ```
 
 The server starts on **http://localhost:3000**. Swagger UI is at **http://localhost:3000/docs**.
+
+
+## Why SQLite
+
+SQLite needs no separate server or install — the entire database is one file (`tasks.db`),
+created automatically the first time the app runs. That makes it a natural fit for a small
+project like this: zero setup, and unlike the in-memory version from Assignment 1, your
+tasks now survive a server restart because they live on disk, not in a JavaScript variable.
+
+`tasks.db` is git-ignored on purpose — each fresh clone creates and seeds its own database
+the first time it runs, so nobody accidentally commits their local data.
+
+
+## Database
+
+![DB Browser showing the tasks table](images/db-browser-screenshot.png)
+
+Example query run directly in DB Browser's "Execute SQL" tab:
+
+```sql
+SELECT * FROM tasks WHERE done = 1;
+```
+
+This returned only the completed tasks — confirming that filtering works exactly like the
+`?done=true` query parameter I built in Assignment 1, just done by the database instead of
+a JavaScript `.filter()`.
 
 ## Endpoints
 
@@ -45,7 +72,7 @@ curl -i -X POST http://localhost:3000/tasks \
   -d '{"title":"Buy milk"}'
 ```
 
-![alt text](image.png)
+![create task](images/image.png)
 
 ```
 HTTP/1.1 201 Created
@@ -57,25 +84,15 @@ Content-Type: application/json; charset=utf-8
 
 ## Swagger UI
 
-![alt text](image-1.png)
+![swagger UI](images/image-1.png)
 
-## The mortality experiment
+## The persistence experiment (formerly "the mortality experiment")
 
-I created two new tasks via POST /tasks, then stopped the server with ---> Ctrl+C and ran
-npm start again. 
-GET /tasks showed only the original 3 seed tasks — the two I added
-were gone. This happens because the task list lives only in a JavaScript variable in
-memory, when the Node process exits, that variable and everything in it is destroyd,
-and the next `npm start` runs the file fresh from its hardcoded seed data.
-
-Experiment:
-  - When i run the Get /tasks i see the Seeded task
-  After that i created a new one AND again see the Get task List the new one is their.
-  However i refresh the page the new one there 
-  But when i `RESTART` the server the new created task was Gone!. Only the seeded will be there.
-  - Get the Task by ID 
-  - Update the Task by ID
-  - Delete the Task by ID
+I created a task via POST /tasks, then stopped the server with Ctrl+C and ran npm start
+again. GET /tasks showed the new task still there. This is the opposite of Assignment 1's
+behavior — because tasks now live as rows in tasks.db on disk instead of a JavaScript
+variable in memory, restarting the Node process no longer destroys them; only the file
+being deleted would.
 
 ## AI vs me (Stage 7 — bonus)
 
