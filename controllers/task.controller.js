@@ -1,37 +1,11 @@
-// controllers/task.controller.js
-import * as Task from "../models/task.model.js";
-
-function isValidTitle(title) {
-  return typeof title === "string" && title.trim().length > 0;
+export async function listTasks(req, res) {
+  const tasks = await Task.getAll();
+  res.status(200).json(tasks);
 }
 
-export function listTasks(req, res) {
-  let result = Task.getAll();
-
-  const { done, search, limit, offset } = req.query;
-
-  if (done !== undefined) {
-    const wantDone = done === "true";
-    result = result.filter((t) => t.done === wantDone);
-  }
-
-  if (search) {
-    const term = String(search).toLowerCase();
-    result = result.filter((t) => t.title.toLowerCase().includes(term));
-  }
-
-  if (offset !== undefined || limit !== undefined) {
-    const start = Number(offset) || 0;
-    const end = limit !== undefined ? start + Number(limit) : undefined;
-    result = result.slice(start, end);
-  }
-
-  res.status(200).json(result);
-}
-
-export function getTask(req, res) {
+export async function getTask(req, res) {
   const id = Number(req.params.id);
-  const task = Task.getById(id);
+  const task = await Task.getById(id);
 
   if (!task) {
     return res.status(404).json({ error: `Task ${id} not found` });
@@ -40,18 +14,18 @@ export function getTask(req, res) {
   res.status(200).json(task);
 }
 
-export function createTask(req, res) {
+export async function createTask(req, res) {
   const { title } = req.body || {};
 
-  if (!isValidTitle(title)) {
+  if (typeof title !== "string" || title.trim().length === 0) {
     return res.status(400).json({ error: "title is required and must be a non-empty string" });
   }
 
-  const newTask = Task.create({ title: title.trim() });
+  const newTask = await Task.create({ title: title.trim() });
   res.status(201).json(newTask);
 }
 
-export function updateTask(req, res) {
+export async function updateTask(req, res) {
   const id = Number(req.params.id);
   const { title, done } = req.body || {};
 
@@ -59,7 +33,7 @@ export function updateTask(req, res) {
     return res.status(400).json({ error: "provide at least one of: title, done" });
   }
 
-  if (title !== undefined && !isValidTitle(title)) {
+  if (title !== undefined && (typeof title !== "string" || title.trim().length === 0)) {
     return res.status(400).json({ error: "title must be a non-empty string" });
   }
 
@@ -67,7 +41,7 @@ export function updateTask(req, res) {
     return res.status(400).json({ error: "done must be a boolean" });
   }
 
-  const updated = Task.update(id, {
+  const updated = await Task.update(id, {
     title: title !== undefined ? title.trim() : undefined,
     done,
   });
@@ -79,9 +53,9 @@ export function updateTask(req, res) {
   res.status(200).json(updated);
 }
 
-export function deleteTask(req, res) {
+export async function deleteTask(req, res) {
   const id = Number(req.params.id);
-  const removed = Task.remove(id);
+  const removed = await Task.remove(id);
 
   if (!removed) {
     return res.status(404).json({ error: `Task ${id} not found` });
@@ -90,8 +64,8 @@ export function deleteTask(req, res) {
   res.status(204).send();
 }
 
-export function getStats(req, res) {
-  const all = Task.getAll();
+export async function getStats(req, res) {
+  const all = await Task.getAll();
   const done = all.filter((t) => t.done).length;
 
   res.status(200).json({
@@ -101,7 +75,7 @@ export function getStats(req, res) {
   });
 }
 
-export function resetTasks(req, res) {
-  const tasks = Task.reset();
+export async function resetTasks(req, res) {
+  const tasks = await Task.reset();
   res.status(200).json({ message: "Tasks reset to seed data", tasks });
 }

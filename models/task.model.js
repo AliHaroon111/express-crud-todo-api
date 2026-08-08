@@ -1,37 +1,48 @@
 // models/task.model.js
 import db from "../db/connection.js";
 
-function toTask(row) {
-  return { id: row.id, title: row.title, done: Boolean(row.done) };
+export async function getAll() {
+  const { rows } = await db.query("SELECT * FROM tasks");
+  return rows;
 }
 
-export function getAll() {
-  const rows = db.prepare("SELECT * FROM tasks").all();
-  return rows.map(toTask);
+export async function getById(id) {
+  const { rows } = await db.query("SELECT * FROM tasks WHERE id = $1", [id]);
+  return rows[0];
 }
 
-export function getById(id) {
-  const row = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id);
-  return row ? toTask(row) : undefined;
+export async function create({ title }) {
+  const { rows } = await db.query(
+    "INSERT INTO tasks (title, done) VALUES ($1, $2) RETURNING *",
+    [title, false]
+  );
+  return rows[0];
 }
 
-export function create({ title }) {
-  const result = db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)").run(title, 0);
-  return getById(result.lastInsertRowid);
-}
-
-export function update(id, { title, done }) {
-  const existing = getById(id);
+export async function update(id, { title, done }) {
+  const existing = await getById(id);
   if (!existing) return null;
 
   const newTitle = title !== undefined ? title : existing.title;
   const newDone = done !== undefined ? done : existing.done;
 
-  db.prepare("UPDATE tasks SET title = ?, done = ? WHERE id = ?").run(newTitle, newDone ? 1 : 0, id);
-  return getById(id);
+  const { rows } = await db.query(
+    "UPDATE tasks SET title = $1, done = $2 WHERE id = $3 RETURNING *",
+    [newTitle, newDone, id]
+  );
+  return rows[0];
 }
 
-export function remove(id) {
-  const result = db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
-  return result.changes > 0;
+export async function remove(id) {
+  const { rowCount } = await db.query("DELETE FROM tasks WHERE id = $1", [id]);
+  return rowCount > 0;
+}
+
+export async function reset() {
+  await db.query("TRUNCATE tasks RESTART IDENTITY");
+  await db.query(
+    "INSERT INTO tasks (title, done) VALUES ($1, $2), ($3, $4), ($5, $6)",
+    ["Buy milk", false, "Read chapter 3", true, "Write CRUD API", false]
+  );
+  return getAll();
 }
