@@ -1,62 +1,63 @@
 # Task API — CRUD To-Do List
 
-A small Express.js API that manages an in-memory to-do list: create, read, update, and delete tasks.
-Built for FlyRank Internship — Backend Track — Week 2 — Assignment A1.
+A REST API that manages a to-do list with full CRUD, running against a containerized
+**PostgreSQL** database via Docker Compose.
+Built for FlyRank Internship — Backend Track. Currently on Assignment 3 (containerization);
+built on top of Assignment 1 (in-memory) and Assignment 2 (SQLite) in the same repo.
 
 ## What this is
 
-- A REST API with full CRUD on a to-do list, backed by a real **SQLite database** (`tasks.db`).
+- A REST API with full CRUD on a to-do list, backed by **Postgres running in Docker**.
 - Built with Node.js + Express (ESM modules), following an **MVC structure**:
-  - `db/` — the SQLite connection, table creation, and one-time seed
-  - `models/` — SQL queries wrapped as plain functions (the data-access layer)
+  - `db/` — the Postgres connection pool, table creation, and one-time seed
+  - `models/` — SQL queries wrapped as plain async functions (the data-access layer)
   - `controllers/` — business logic and validation for each endpoint
   - `routes/` — maps paths + HTTP methods to controllers
   - `app.js` — wires everything together
   - `server.js` — starts the server
 - Interactive API docs via **Swagger UI** at `/docs`.
+- The whole stack (app + database) starts with a single `docker compose up`.
 
-## How to install & run
+## How to run
 
 ```bash
-npm install
-npm start
+cp .env.example .env
+docker compose up
 ```
 
-The server starts on **http://localhost:3000**. Swagger UI is at **http://localhost:3000/docs**.
+The API runs on **http://localhost:3000**. Postgres runs in its own container, with a
+named volume (`taskdata`) so your data survives `docker compose down` and `up` again.
 
+No local Node.js install, `npm install`, or Postgres install needed — Docker handles
+all of it. (If you want to run the app directly on your machine instead, without Docker,
+see "Running without Docker" below.)
 
-## Why SQLite
+## Why Docker + Postgres
 
-SQLite needs no separate server or install — the entire database is one file (`tasks.db`),
-created automatically the first time the app runs. That makes it a natural fit for a small
-project like this: zero setup, and unlike the in-memory version from Assignment 1, your
-tasks now survive a server restart because they live on disk, not in a JavaScript variable.
+Assignment 1 stored tasks in memory (gone on every restart). Assignment 2 moved to
+SQLite (a single file — better, but still not how real backends run). This assignment
+moves to **Postgres**, a full database server — the same kind that powers most
+production systems, FlyRank included.
 
-`tasks.db` is git-ignored on purpose — each fresh clone creates and seeds its own database
-the first time it runs, so nobody accidentally commits their local data.
+Running Postgres in Docker means nobody installs it directly, fights version mismatches,
+or hits "works on my machine" — `docker compose up` gives an identical, disposable
+database in seconds, on any OS. The `taskdata` named volume is what makes the data
+outlive the container: removing and recreating the container doesn't touch the volume,
+so a full `docker compose down && docker compose up` still has your data.
 
-
-## Database
-
-![DB Browser showing the tasks table](images/db-browser-screenshot.png)
-
-Example query run directly in DB Browser's "Execute SQL" tab:
-
-```sql
-SELECT * FROM tasks WHERE done = 1;
-```
-
-This returned only the completed tasks — confirming that filtering works exactly like the
-`?done=true` query parameter I built in Assignment 1, just done by the database instead of
-a JavaScript `.filter()`.
+`.env` holds the database connection string; it's git-ignored so no credentials ever
+reach GitHub. `.env.example` is committed instead, showing which variables to set.
 
 ## Endpoints
+
+All endpoints below run against Postgres. Same paths, same request/response shapes, same
+status codes as Assignments 1 and 2 — only the storage layer changed underneath.
 
 | CRUD | Method | Path | Description |
 |---|---|---|---|
 | — | GET | `/` | API info |
 | — | GET | `/health` | Health check |
-| Read | GET | `/tasks` | List all tasks (supports `?done=`, `?search=`, `?limit=&offset=`) |
+| Read | GET | `/tasks` | List all tasks |
 | Read | GET | `/tasks/:id` | Get a single task (404 if not found) |
 | Create | POST | `/tasks` | Create a task from `{ "title": "..." }` (400 if title missing/empty) |
 | Update | PUT | `/tasks/:id` | Update a task's title and/or done (400 invalid body, 404 unknown id) |
@@ -72,12 +73,9 @@ curl -i -X POST http://localhost:3000/tasks \
   -d '{"title":"Buy milk"}'
 ```
 
-![create task](images/image.png)
-
 ```
 HTTP/1.1 201 Created
 Content-Type: application/json; charset=utf-8
-...
 
 {"id":4,"title":"Buy milk","done":false}
 ```
@@ -86,82 +84,38 @@ Content-Type: application/json; charset=utf-8
 
 ![swagger UI](images/image-1.png)
 
-## The persistence experiment (formerly "the mortality experiment")
+## Database
 
-I created a task via POST /tasks, then stopped the server with Ctrl+C and ran npm start
-again. GET /tasks showed the new task still there. This is the opposite of Assignment 1's
-behavior — because tasks now live as rows in tasks.db on disk instead of a JavaScript
-variable in memory, restarting the Node process no longer destroys them; only the file
-being deleted would.
+![Postgres data via psql](images/postgres-screenshot.png)
 
-## AI vs me (Stage 7 — bonus)
+Example query run directly against the running container:
 
+```bash
+docker exec -it todo-api-db-1 psql -U postgres -d tasks -c "SELECT * FROM tasks;"
+```
 
-  1. My full prompt to the AI assistant
-    Build a REST API in Node.js with Express for managing a to-do list.
+## The persistence experiment, containerized
 
-  Requirements:
+I created a task via `POST /tasks`, then ran `docker compose down` followed by
+`docker compose up`. `GET /tasks` still showed the task. This proves the data lives in
+the `taskdata` volume, not inside the `db` container itself — removing and recreating
+the container (which `down`/`up` does) doesn't touch the volume, so nothing was lost.
 
-  Tasks have an id, a title, and a done boolean.
-  Store tasks in memory, pre-filled with 3 example tasks.
-  Endpoints:
-  GET / -> returns basic API info as JSON
-  GET /health -> returns { status: "ok" }
-  GET /tasks -> list all tasks
-  GET /tasks/:id -> get one task, 404 if not found
-  POST /tasks -> create a task from a JSON body with a title, 400 if title is missing
-  PUT /tasks/:id -> update a task's title and/or done, 404 if not found
-  DELETE /tasks/:id -> delete a task, 404 if not found
-  Use proper HTTP status codes for success and errors.
-  Add Swagger UI documentation for the API.
-  Organize the code in a clean, maintainable way (MVC style).
-  
+## Running without Docker (optional, local dev)
 
+If you have Node.js and a Postgres instance available separately:
 
-  **2. What the AI did better**
+```bash
+npm install
+node --env-file=.env server.js
+```
 
-  It scaffolded the whole MVC structure and every endpoint correctly in one shot, including
-  Swagger UI — using `swagger-jsdoc` to generate the spec from route comments instead of a
-  hand-written `openapi.json`, which is less to maintain by hand. It also used plain object
-  destructuring (`Object.assign(task, updates)`) for PUT, which is more compact than my
-  explicit field-by-field update.
-
-  **3. What it got wrong or silently ignored**
-
-  Running my own Stage 4 checkpoint curls against it:
-  - `DELETE /tasks/:id` returns `200` with a message body, not `204` with an empty body —
-    the spec I gave said "use proper status codes" but didn't name 204 explicitly, and the
-    AI defaulted to 200 everywhere instead.
-  - `PUT /tasks/:id` with an empty body `{}` returns `200` and just echoes the task
-    unchanged, instead of `400`. My prompt said "400 if title is missing" but only in the
-    context of POST — I never said PUT should also reject an empty update, so it didn't.
-  - No trimming/whitespace validation on `title` — a title of `"   "` would pass validation
-    in the AI's version but fail in mine.
-  - No filtering, search, or pagination on `GET /tasks` — I never mentioned these, so it
-    didn't add them.
-
-  **4. What my prompt forgot to specify**
-
-  - Module system (ESM vs CommonJS) — the AI defaulted to CommonJS (`require`/`module.exports`),
-    while I built mine in ESM (`import`/`export`).
-  - What "clean, maintainable, MVC style" specifically means in file-naming terms — the AI
-    used `taskModel.js`/`taskController.js`/`taskRoutes.js` while I used
-    `task.model.js`/`task.controller.js`/`task.routes.js`. Functionally identical, purely
-    a naming-convention gap I left open.
-  - Exact status code for DELETE (204 vs 200) and whether PUT should validate an empty body —
-    both silently decided by the AI in ways that differ from the assignment's actual spec.
-  - Whether I wanted a hand-written `openapi.json` or a generated one — the AI chose to
-    generate it from `swagger-jsdoc` since I didn't say either way.
-
-  **5. What changed for the rematch**
-
-  I added three lines to the original prompt: "DELETE must return 204 with no body," "PUT
-  with an empty body should return 400," and "use ESM import/export syntax." Regenerating
-  with those added, the AI's DELETE and PUT responses matched the assignment spec exactly,
-  confirming the gaps were entirely due to missing detail in my first prompt, not the AI's
-  capability.
+`.env`'s `DATABASE_URL` should point at `localhost:5432` in this mode, not `db:5432`
+(that hostname only resolves inside Docker Compose's private network).
 
 ## Notes
 
-- Data is in-memory only — restarting the server resets it to the 3 seed tasks.
-- No database is used yet — that's next week.
+- Data lives in Postgres, inside a Docker-managed volume — not in memory (A1) and not
+  in a local file (A2).
+- Parameterized queries (`$1`, `$2`, ...) are used throughout — no user input is ever
+  glued directly into a SQL string.
