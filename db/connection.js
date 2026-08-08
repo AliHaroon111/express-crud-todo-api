@@ -1,25 +1,26 @@
 // db/connection.js
-import Database from "better-sqlite3";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import pg from "pg";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const db = new Database(join(__dirname, "..", "tasks.db"));
+const { Pool } = pg;
 
-db.exec(`
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+await pool.query(`
   CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
-    done INTEGER NOT NULL DEFAULT 0
+    done BOOLEAN NOT NULL DEFAULT false
   )
 `);
 
-const row = db.prepare("SELECT COUNT(*) AS count FROM tasks").get();
-if (row.count === 0) {
-  const seed = db.prepare("INSERT INTO tasks (title, done) VALUES (?, ?)");
-  seed.run("Buy milk", 0);
-  seed.run("Read chapter 3", 1);
-  seed.run("Write CRUD API", 0);
+const { rows } = await pool.query("SELECT COUNT(*) AS count FROM tasks");
+if (Number(rows[0].count) === 0) {
+  await pool.query(
+    "INSERT INTO tasks (title, done) VALUES ($1, $2), ($3, $4), ($5, $6)",
+    ["Buy milk", false, "Read chapter 3", true, "Write CRUD API", false]
+  );
 }
 
-export default db;
+export default pool;
