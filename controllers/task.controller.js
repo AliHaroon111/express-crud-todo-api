@@ -1,3 +1,5 @@
+import * as Task from "../models/task.model.js";
+
 export async function listTasks(req, res) {
   const tasks = await Task.getAll();
   res.status(200).json(tasks);
